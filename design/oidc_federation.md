@@ -153,7 +153,7 @@ We need to add explanation about supporting the spec into [keycloak-documentatio
 
 ## Implementation proposal
 
-**Source:** https://github.com/eosc-kc/keycloak/tree/openid-federation_(ver.11.0.2)
+**Source:** https://github.com/eosc-kc/keycloak/tree/openid-federation-op
 
 **Current limitations:**
 Current implementation is related to supporting configuring Keycloak as an Openid Provider that can participate in an OpenID Connect Federation. 
