@@ -84,11 +84,12 @@ Note that in Automatic Registration, the RP will not be saved in Keycloak’s cl
 POST web service with body being a signed RP Entity Statement ( application/jose).
 [Actions](https://openid.net/specs/openid-connect-federation-1_0.html#rfc.section.9.2.1.2.1) :
 1. Check for valid and not expired signed entity statement
-2. Find at least one valid [trust chain](https://openid.net/specs/openid-connect-federation-1_0.html#rfc.section.7)
-3. Find one trust chain with accepted Metadata Policies. Enforce Metadata Policies to RP Metadata.
-4. Check that no existing Client Id matches the entity identifier in this realm.
-5. Save RP Metadata as Keycloak does in [Dynamic Client Registration](https://www.keycloak.org/docs/latest/securing_apps/index.html#openid-connect-dynamic-client-registration). The RP’s Entity Identifier is saved as the Client Id. 
-6. RP Metadata is changed based on the Client saved in the database and RP Metadata Policies used are added to the Entity Statement. 
+2. aud field must contain Keycloak OP entity Identifier (http(s)://host:port/{basepath}/realms/{realm-name} ) 
+3. Find at least one valid [trust chain](https://openid.net/specs/openid-connect-federation-1_0.html#rfc.section.7)
+4. Find one trust chain with accepted Metadata Policies. Enforce Metadata Policies to RP Metadata.
+5. Check that no existing Client Id matches the entity identifier in this realm.
+6. Save RP Metadata as Keycloak does in [Dynamic Client Registration](https://www.keycloak.org/docs/latest/securing_apps/index.html#openid-connect-dynamic-client-registration). The RP’s Entity Identifier is saved as the Client Id. 
+7. RP Metadata is changed based on the Client saved in the database and RP Metadata Policies used are added to the Entity Statement. 
 Moreover, the trust anchor of the accepted trust chain and the authority hint of Keycloak Federated OP for this trust chain are added. The updated signed Entity Statement is returned.
 
 If the realm does not support explicit registration, an error Response will be returned.
@@ -107,8 +108,9 @@ We need to extend the current OpenID Connect 1.0 Identity provider model (`OIDCI
 - `organization_name` (optional): A human readable name representing the organization owning the RP (Keycloak).
 - `authority_hints` (required): the entity identifier(s) of intermediate entities or trust anchor(s) that Keycloak RP belongs to. This information is intended to be included in the self-signed entity statement of the RP. 
 - `expired`: Entity statement expiration time. The client registration will expire at this time. In the case of the explicit registration, Keycloak will need to periodically renew the registration (see [this](#explicit-registration-1) for details).
-- `trust_anchor_id` (required only in the case of the explicit client registration type): The value is the entity identifier of a trust anchor. This value is not supplied by the realm admin. 
-Instead, the OP will provide the value to the RP based on the trust anchor it chose when responding to an explicit client registration.
+- `trust_anchor_ids` (required): List containing the entity identifier of the trust anchors. 
+- `op_entity_identifier` : OP entity identifier. Required only for explicit registration.
+
 
 The Client Id will be automatically set to the entity identifier ( `http(s)://host:port/{basepath}/realms/{realm-name}/{rp_alias}`). The Client Secret will not be set. If `client_registration_types` is set to explicit, Identity Provider will be disabled. See [this](#explicit-registration-1) for details
 
@@ -118,30 +120,28 @@ Moreover, `OIDCFedIdentityProviderFactory` needs to extend `AbstractIdentityProv
 
 NO database changes are needed. Extra fields will be saved in IDENTITY_PROVIDER_CONFIG.
 
-### Well-known OIDC federation endpoint for RP 
-
-The OIDC federation specification introduces the [.well-known/openid-federation](https://openid.net/specs/openid-connect-federation-1_0.html#federation_configuration) endpoint also for the RPs - which provides a JWT self-signed entity statement for the RP. 
-Thus, keycloak should have an additional endpoint under each tenant (realm), with the alias name of the idp prepended. 
-The relative path could follow the format: http(s)://host:port/{basepath}/realms/{realm-name}/{rp_alias}/.well-known/openid-federation.
-This will allow communicating with the other entities of the federation with the following entity identifier : http(s)://host:port/{basepath}/realms/{realm-name}/{rp_alias}, which eventually, uniquely identifies it within the whole federation. 
-Response content type MUST be set to application/jose.RP Metadata need to be constructed from the defined Federation OIDC Identity Provider.
-
 ### [Automatic Registration](https://openid.net/specs/openid-connect-federation-1_0.html#rfc.section.9.1)
 
-We propose to use authorization request in automatic registration which is already supported by Keycloak. 
-Keycloak will try to interact with the Federated OP without going through a registration process. 
-To support this, the request parameter should contain the signed entity statement of Federation OIDC Identity Provider saved on Keycloak. 
-Entity Statement value is same as described in [Well-known OIDC federation endpoint for RP](#well-known-oidc-federation-endpoint-for-rp). 
+We propose to use authorization request in automatic registration which is already supported by Keycloak. Keycloak will try to interact with the Federated OP without going through a registration process. 
+To support this, the request parameter should contain the signed entity statement of Federation OIDC Identity Provider saved on Keycloak. Entity Statement value is same as described in [Well-known OIDC federation endpoint for RP](#rp-well-know). 
 
-### [Explicit Registration](https://openid.net/specs/openid-connect-federation-1_0.html#explicit)
-The Keycloak RP needs to be registered with the Federated OP in order to be enabled. 
-We propose to show a register RP button after saving the explicit Federation OIDC Identity Provider. 
-If the realm admin presses this button, keycloak will send a POST request with the body containing its signed entity Statement to Federation OP federation_registration_endpoint. 
-Entity Statement value is same as described in [Well-known OIDC federation endpoint for RP](#well-known-oidc-federation-endpoint-for-rp). 
+
+#### Well-known OIDC federation endpoint for RP {#rp-well-know}
+
+The OIDC federation specification introduces the [.well-known/openid-federation](https://openid.net/specs/openid-connect-federation-1_0.html#federation_configuration) endpoint also for the RPs that support automatic registration - which provides a JWT self-signed entity statement for the RP. 
+Thus, keycloak should have an additional endpoint available only for OIDC Federation IdP that supports automatic registration under each tenant (realm), with the alias name of the idp prepended. 
+The relative path could follow the format: http(s)://host:port/{basepath}/realms/{realm-name}/{rp_alias}/.well-known/openid-federation - http(s)://host:port/{basepath}/realms/{realm-name}/{rp_alias} will be entity identifier, which eventually uniquely identifies RP within the whole federation. 
+This .well-known is mandatory for a successful automatic registration process. Response content type MUST be set to application/jose.RP Metadata need to be constructed from the defined Federation OIDC Identity Provider.
+
+
+### [Explicit Registration](https://openid.net/specs/openid-connect-federation-1_0.html#explicit){#rp-explicit}
+The Keycloak RP needs to be registered with the Federated OP in order to be enabled. We propose to show a register RP button after saving the explicit Federation OIDC Identity Provider.
+If the realm admin presses this button, keycloak will send a POST request with the body containing its signed entity Statement to Federation OP federation_registration_endpoint. Entity Statement value is same as described in [Well-known OIDC federation endpoint for RP](##rp-well-know). 
 If the Federated OP returns a success response, Keycloak should parse the returned Entity Statement and apply the required configuration changes to the Federation OIDC identity Provider. 
 The returned Entity Statement will contain at least Client Secret (in the case of client secret post/basic auth/jwt client authentication) and Client Id (the OP may choose this value to be different from the RP’s entity identifier). 
-Without a successful registration process, the Federated OIDC identity Provider configuration will be saved with `enabled` set to `false`. 
-A Runnable Task will be executed periodically to renew the registration(s) with federated OIDC Providers.
+The OP will choose the trust anchor id of RP registration. `trust_anchor_ids` will contain only the returned trust anchor id.
+Without a successful registration process, the Federated OIDC identity Provider configuration will be saved with `enabled` set to `false`. A Runnable Task will be executed periodically to renew the registration(s) with federated OIDC Providers.
+
 
 ## Testing
 
