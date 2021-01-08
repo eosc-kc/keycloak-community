@@ -108,7 +108,7 @@ We need to extend the current OpenID Connect 1.0 Identity provider model (`OIDCI
 - `organization_name` (optional): A human readable name representing the organization owning the RP (Keycloak).
 - `authority_hints` (required): the entity identifier(s) of intermediate entities or trust anchor(s) that Keycloak RP belongs to. This information is intended to be included in the self-signed entity statement of the RP. 
 - `expired`: Entity statement expiration time. The client registration will expire at this time. In the case of the explicit registration, Keycloak will need to periodically renew the registration (see [this](#explicit-registration-1) for details).
-- `trust_anchor_ids` (required): List containing the entity identifier of the trust anchors. 
+- `trust_anchor_ids` (required): List containing the entity identifiers of the trust anchors. 
 - `op_entity_identifier` : OP entity identifier. Required only for explicit registration.
 
 
@@ -122,16 +122,16 @@ NO database changes are needed. Extra fields will be saved in IDENTITY_PROVIDER_
 
 ### [Automatic Registration](https://openid.net/specs/openid-connect-federation-1_0.html#rfc.section.9.1)
 
-We propose to use authorization request in automatic registration which is already supported by Keycloak. Keycloak will try to interact with the Federated OP without going through a registration process. 
-To support this, the request parameter should contain the signed entity statement of Federation OIDC Identity Provider saved on Keycloak. Entity Statement value is same as described in [Well-known OIDC federation endpoint for RP](#rp-well-know). 
+Automatic registration will allow Keycloak to act as an RP that can send authorization requests to an OP without first registering with the OP. We propose to perform the request by passing a request object by value as described in section 6.1 in OpenID Connect Core 1.0, which is already supported by Keycloak.
+To support this, the request parameter value is a JWT whose Claims are the request parameters specified in Section 3.1.2 in OpenID Connect Core 1.0. The JWT MUST be signed and MAY be encrypted. 
 
 
 #### Well-known OIDC federation endpoint for RP {#rp-well-know}
 
 The OIDC federation specification introduces the [.well-known/openid-federation](https://openid.net/specs/openid-connect-federation-1_0.html#federation_configuration) endpoint also for the RPs that support automatic registration - which provides a JWT self-signed entity statement for the RP. 
 Thus, keycloak should have an additional endpoint available only for OIDC Federation IdP that supports automatic registration under each tenant (realm), with the alias name of the idp prepended. 
-The relative path could follow the format: http(s)://host:port/{basepath}/realms/{realm-name}/{rp_alias}/.well-known/openid-federation - http(s)://host:port/{basepath}/realms/{realm-name}/{rp_alias} will be entity identifier, which eventually uniquely identifies RP within the whole federation. 
-This .well-known is mandatory for a successful automatic registration process. Response content type MUST be set to application/jose.RP Metadata need to be constructed from the defined Federation OIDC Identity Provider.
+The relative path could follow the format: http(s)://host:port/{basepath}/realms/{realm-name}/{idp_alias}/.well-known/openid-federation - http(s)://host:port/{basepath}/realms/{realm-name}/{idp_alias} will be entity identifier, which eventually uniquely identifies RP within the whole federation. 
+This .well-known endpoint is mandatory for a successful automatic registration process. Response content type MUST be set to application/jose.RP Metadata need to be constructed from the defined Federation OIDC Identity Provider.
 
 
 ### [Explicit Registration](https://openid.net/specs/openid-connect-federation-1_0.html#explicit){#rp-explicit}
